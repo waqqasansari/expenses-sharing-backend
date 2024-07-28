@@ -1,6 +1,3 @@
-from django.shortcuts import render
-
-# Create your views here.
 from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from .models import User
@@ -9,32 +6,12 @@ from rest_framework.response import Response
 from rest_framework import generics, status
 
 class UserCreateView(generics.CreateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [AllowAny]
+    queryset = User.objects.all()  # Queryset of all User objects
+    serializer_class = UserSerializer  # Serializer class for user creation
+    permission_classes = [AllowAny]  # Allow any user to access this view
 
     def perform_create(self, serializer):
-        serializer.save()
-
-
-# class UserCreateView(generics.CreateAPIView):
-#     queryset = User.objects.all()
-#     serializer_class = UserSerializer
-#     permission_classes = [AllowAny]
-
-#     def post(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-#         if serializer.is_valid():
-#             user = serializer.save()
-#             return Response({"message": "User Created Successfully. Now perform Login to get your token"})
-#         else:
-#             errors = serializer.errors
-#             error_message = {}
-#             for field, error_list in errors.items():
-#                 error_message[field] = [str(error) for error in error_list]
-#             return Response({"message": error_message}, status=status.HTTP_400_BAD_REQUEST)
-
-# from django.db import transaction
+        serializer.save()  # Save the new user instance
 
 # class UserCreateView(generics.CreateAPIView):
 #     queryset = User.objects.all()
@@ -83,30 +60,22 @@ class UserCreateView(generics.CreateAPIView):
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
-
-class CustomTokenObtainPairView(TokenObtainPairView):
-    serializer_class = CustomTokenObtainPairSerializer
-
-
 from rest_framework import generics, permissions
 from .models import Expense
 from .serializers import ExpenseSerializer
 from rest_framework.permissions import IsAuthenticated
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer  # Custom serializer for obtaining JWT token
+
+
 class ExpenseCreateView(generics.CreateAPIView):
-    queryset = Expense.objects.all()
-    serializer_class = ExpenseSerializer
-    permission_classes = [IsAuthenticated]
+    queryset = Expense.objects.all()  # Queryset of all Expense objects
+    serializer_class = ExpenseSerializer  # Serializer class for expense creation
+    permission_classes = [IsAuthenticated]  # Only authenticated users can access this view
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-# class UserExpensesView(generics.ListAPIView):
-#     serializer_class = ExpenseSerializer
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     def get_queryset(self):
-#         return Expense.objects.filter(participants__user=self.request.user)
+        serializer.save(created_by=self.request.user)  # Save the new expense instance with the user who created it
 
 
 from rest_framework.views import APIView
@@ -118,9 +87,16 @@ class UserExpensesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
+        # Get the authenticated user making the request
         user = request.user
+        
+        # Retrieve all participants where the user is involved
         participants = Participant.objects.filter(user=user)
+        
+        # Extract expenses associated with each participant
         expenses = [p.expense for p in participants]
+        
+        # Prepare the response data in a structured format
         data = [
             {
                 "id": expense.id,
@@ -135,18 +111,17 @@ class UserExpensesView(APIView):
             }
             for expense in expenses
         ]
+        # Return the structured data as a JSON response
         return Response(data)
-
-# class OverallExpensesView(generics.ListAPIView):
-#     queryset = Expense.objects.all()
-#     serializer_class = ExpenseSerializer
-#     permission_classes = [permissions.IsAuthenticated]
 
 class AllExpensesView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
+        # Retrieve all expenses from the database
         expenses = Expense.objects.all()
+        
+        # Prepare the response data in a structured format
         data = [
             {
                 "id": expense.id,
@@ -168,30 +143,16 @@ import csv
 from django.http import HttpResponse
 from .models import Participant
 
-# class DownloadBalanceSheetView(generics.GenericAPIView):
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     def get(self, request, *args, **kwargs):
-#         response = HttpResponse(content_type='text/csv')
-#         response['Content-Disposition'] = 'attachment; filename="balance_sheet.csv"'
-
-#         writer = csv.writer(response)
-#         writer.writerow(['Expense', 'User', 'Amount'])
-
-#         participants = Participant.objects.filter(user=request.user)
-#         for participant in participants:
-#             writer.writerow([participant.expense.title, participant.user.email, participant.amount])
-
-#         return response
-
 
 class DownloadBalanceSheetView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
+        # Prepare HTTP response with CSV content type and file name
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="balance_sheet.csv"'
 
+        # Initialize CSV writer and write header row
         writer = csv.writer(response)
         writer.writerow(['Expense', 'User', 'Amount'])
 
@@ -201,7 +162,10 @@ class DownloadBalanceSheetView(APIView):
         for participant in participants:
             writer.writerow([participant.expense.title, participant.user.email, participant.amount])
 
+        # Add empty row for separation
         writer.writerow([])
+
+        # Write section header for overall expenses
         writer.writerow(['Overall Expenses'])
         writer.writerow(['Expense', 'User', 'Amount'])
 
@@ -217,12 +181,20 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics
 from .serializers import UserSerializer
 
+# Get the custom User model defined for the project
 User = get_user_model()
 
 class UserDetailView(generics.RetrieveAPIView):
+
+    # Queryset containing all User objects
     queryset = User.objects.all()
+
+    # Serializer class responsible for converting User objects to/from JSON
     serializer_class = UserSerializer
+
+    # Permission classes defining who can access this view (authenticated users only)
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
+        # Retrieve and return the currently authenticated user
         return self.request.user

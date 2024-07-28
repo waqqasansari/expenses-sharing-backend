@@ -58,12 +58,13 @@ User = get_user_model()
 
 class ParticipantSerializer(serializers.ModelSerializer):
     user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    user_name = serializers.CharField(source='user.name', read_only=True)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
-    percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
+    percentage = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, allow_null=True)
 
     class Meta:
         model = Participant
-        fields = ['user', 'amount', 'percentage']
+        fields = ['user', 'user_name', 'amount', 'percentage']
 
 # class ExpenseSerializer(serializers.ModelSerializer):
 #     participants = ParticipantSerializer(many=True)
@@ -94,35 +95,46 @@ class ParticipantSerializer(serializers.ModelSerializer):
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    # Serializer for nested 'participants' field
     participants = ParticipantSerializer(many=True)
+    # Primary key related field for 'created_by' user
+    created_by = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    # Read-only field to display 'created_by' user's name
+    created_by_name = serializers.CharField(source='created_by.name', read_only=True)
 
     class Meta:
         model = Expense
-        fields = ['id', 'title', 'amount', 'split_method', 'participants']
-        # Removed 'created_by' from fields, it will be set in the view
+        fields = ['id', 'title', 'amount', 'split_method', 'created_by', 'created_by_name', 'participants']
 
     def validate(self, data):
+        # Validate the data based on the chosen 'split_method'
         split_method = data.get('split_method')
         participants = data.get('participants', [])
         
         if split_method == 'equal':
+            # Validate 'equal' split method
             if len(participants) == 0:
                 raise serializers.ValidationError("At least one participant is required.")
             split_amount = data['amount'] / len(participants)
             for participant in participants:
                 participant['amount'] = split_amount
+                participant['percentage'] = None
         
         elif split_method == 'exact':
+            # Validate 'exact' split method
             total_amount = sum(participant.get('amount', 0) for participant in participants)
             if total_amount != data['amount']:
                 raise serializers.ValidationError("The sum of exact amounts must equal the total amount.")
+            for participant in participants:
+                participant['percentage'] = None
 
         elif split_method == 'percentage':
-            total_percentage = sum(participant.get('amount', 0) for participant in participants)
+            # Validate 'percentage' split method
+            total_percentage = sum(participant.get('percentage', 0) for participant in participants)
             if total_percentage != 100:
                 raise serializers.ValidationError("The sum of percentages must equal 100%.")
             for participant in participants:
-                participant['amount'] = data['amount'] * (participant['amount'] / 100)
+                participant['amount'] = data['amount'] * (participant['percentage'] / 100)
 
         else:
             raise serializers.ValidationError("Invalid split method.")
@@ -130,6 +142,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        # Create Expense instance and associated Participants
         participants_data = validated_data.pop('participants')
         expense = Expense.objects.create(**validated_data)
         for participant_data in participants_data:
