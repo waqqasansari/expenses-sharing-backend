@@ -117,7 +117,7 @@ Authorization: Bearer your_access_token
 ```json
 {
   "title": "Dinner",
-  "amount": 3000.0,
+  "amount": 5000.0,
   "split_method": "equal",
   "created_by": 1,
   "participants": [{ "user": 1 }, { "user": 2 }, { "user": 3 }]
